@@ -2,6 +2,9 @@ package de.seuhd.ktcodingagent.tools
 
 import de.seuhd.ktcodingagent.io.Workspace
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import java.nio.file.Files
 
 /**
  * Sub-exercise (a): implement [execute].
@@ -25,6 +28,24 @@ class ReadFileTool(private val workspace: Workspace) : Tool {
     override val risky: Boolean = false
 
     override fun execute(args: JsonObject): ToolResult {
-        TODO("Implement read_file (sub-exercise (a)).")
+        //("Implement read_file (sub-exercise (a)).")
+        val path = (args["path"] as? JsonPrimitive)?.content ?: "."
+        val start = (args["start"] as? JsonPrimitive)?.intOrNull ?: 1
+        val end = (args["end"] as? JsonPrimitive)?.intOrNull ?: 200
+        val resolved = workspace.resolveSandboxed(path)
+        if (!Files.isRegularFile(resolved)) {
+            return ToolResult.error("invalid path: $path")
+        }
+        if (!(start >= 1 && start <= end)){
+            return ToolResult.error("invalid range")
+        }
+        val read = Files.readAllLines(resolved)
+        val newstart = start -1
+        val newend = minOf((end -1), read.size-1)
+        val sliced = read.slice(newstart..newend)
+        val format = sliced.mapIndexed { index, line -> "%4d: %s". format(start + index, line)}
+        val header = "# $path"
+        return ToolResult((listOf(header) + format).joinToString("\n"))
+        //4 tests pass
     }
 }
