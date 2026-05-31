@@ -2,6 +2,8 @@ package de.seuhd.ktcodingagent.tools
 
 import de.seuhd.ktcodingagent.io.Workspace
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import java.nio.file.Files
 
 /**
  * Sub-exercise (a): implement [execute].
@@ -23,6 +25,15 @@ class WriteFileTool(private val workspace: Workspace) : Tool {
     override val risky: Boolean = true
 
     override fun execute(args: JsonObject): ToolResult {
-        TODO("Implement write_file (sub-exercise (a)).")
+        //("Implement write_file (sub-exercise (a)).")
+        val path = (args["path"] as? JsonPrimitive)?.content ?: "."
+        val content = (args["content"] as? JsonPrimitive)?.content !!
+        val resolved = workspace.resolveSandboxed(path)
+        if (Files.isDirectory(resolved)) {
+            return ToolResult.error("directory already exists")
+        }
+        Files.createDirectories(resolved.parent)
+        Files.writeString(resolved, content)
+        return ToolResult("wrote $path (${content.length} chars)")
     }
 }
