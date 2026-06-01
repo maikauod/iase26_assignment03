@@ -42,9 +42,9 @@ object ResponseParser {
             return try {
                 val obj = Json.parseToJsonElement(jsonText).jsonObject
 
-                val name =
-                    obj["name"]?.jsonPrimitive?.contentOrNull
-                        ?: return retry("missing tool name")
+                val name = try {
+                    obj["name"]?.jsonPrimitive?.contentOrNull }
+                catch (_: Exception) { null } ?: return retry("missing tool name")
 
                 val argsElement =
                     obj["args"]
