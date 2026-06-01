@@ -30,6 +30,44 @@ class ToolRegistry(
     private val byName: Map<String, Tool> = tools.associateBy { it.name }
 
     fun dispatch(name: String, args: JsonObject, history: List<HistoryEntry>): ToolResult {
-        TODO("Implement dispatch (sub-exercise (a)).")
+        //("Implement dispatch (sub-exercise (a)).")
+        val lookup = byName[name] ?: return ToolResult.error("unknown tool '$name'")
+
+        try {
+            Validation.validate(name,args)
+        }
+        catch (e: ToolValidationException){
+            return ToolResult.error(   "invalid arguments for $name: ${e.message}\n${Validation.toolCallExample(name)}")
+        }
+
+        val lastWriteIndex = history.withIndex().lastOrNull {  it.value is HistoryEntry.ToolEntry && (it.value as HistoryEntry.ToolEntry).name == "write_file" }?.index ?: -1
+
+        val isDupe = history.withIndex().any { (i,e) ->
+            e is HistoryEntry.ToolEntry  && e.name == name && e.args.toString() == args.toString() &&  (name == "write_file" || i > lastWriteIndex)
+        }
+        if (isDupe) {
+            return ToolResult.error("repeated identical tool call")
+        }
+
+        if (lookup.risky && !approvalGate.approve(name, args)) {
+            return ToolResult.error("approval denied")
+        }
+
+        val result = try {
+            lookup.execute(args)
+        }
+        catch (e: SecurityException) {
+            ToolResult.error("security violation: ${e.message}")
+        }
+        catch (e: Exception) {
+            ToolResult.error("tool failed: ${e.message}")
+        }
+        val clip = result.content.take(MAX_TOOL_OUTPUT)
+
+        val finalContent = if (result.content.length > MAX_TOOL_OUTPUT) {"$clip...[truncated]"}
+            else {clip}
+
+        return ToolResult(finalContent, result.isError)
     }
+
 }
