@@ -3,7 +3,11 @@ package de.seuhd.ktcodingagent.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.net.URI
 import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+
 import java.time.Duration
 
 /**
@@ -38,11 +42,65 @@ class OllamaModelClient(
 ) : ModelClient {
 
     override fun complete(prompt: String, maxNewTokens: Int): String {
-        TODO("Implement OllamaModelClient.complete (sub-exercise (b)).")
+        //("Implement OllamaModelClient.complete (sub-exercise (b)).")
+        val uri = URI.create("$host/api/generate")
+        val oContext = GenerateRequest(
+            model = modelName,
+            prompt =prompt,
+            stream = false,
+            raw = false,
+            think = false,
+            options = GenerateOptions(
+                numPredict= maxNewTokens,
+                temperature =temperature,
+                topP = topP)
+    )
+
+        val sContext = JSON.encodeToString(GenerateRequest.serializer(), oContext)
+        val req = HttpRequest.newBuilder().uri(uri).timeout(timeout).header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(sContext)).build()
+
+        val response = try {
+            httpClient.send(req, HttpResponse.BodyHandlers.ofString())
+        } catch (e: Exception) {
+            throw OllamaUnreachableException(host, modelName, e)
+        }
+
+        if (response.statusCode() !in 200..299){
+            throw RuntimeException("${response.statusCode()}${response.body()}")
+        }
+
+        val parsed = JSON.decodeFromString(GenerateResponse.serializer(), response.body())
+        return parsed.response ?: ""
+
     }
 
     fun checkAvailability(): AvailabilityCheck {
-        TODO("Implement OllamaModelClient.checkAvailability (sub-exercise (b)).")
+        //("Implement OllamaModelClient.checkAvailability (sub-exercise (b)).")
+        val uri = URI.create("$host/api/tags")
+
+        val req = HttpRequest.newBuilder().uri(uri).timeout(timeout).GET().build()
+        val res = try {
+            httpClient.send(req, HttpResponse.BodyHandlers.ofString())
+        }catch (e: Exception){
+            return AvailabilityCheck.OllamaUnreachable("Ollama is not running. Could not reach Ollama")
+        }
+        if (res.statusCode() !in 200..299){
+           return AvailabilityCheck.OllamaUnreachable("${res.statusCode()}${res.body()}")
+        }
+
+        val parsed = JSON.decodeFromString(TagsResponse.serializer(), res.body())
+        val mModel = parsed.models.map { it.name }
+        val direct = mModel.contains(modelName)
+        val latest = mModel.contains("$modelName:latest")
+
+        if(!(direct || latest)){
+            return AvailabilityCheck.ModelMissing("could not find model $modelName")
+        }
+        else {
+            return AvailabilityCheck.Ready
+        }
+
     }
 
     companion object {
