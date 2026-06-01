@@ -94,7 +94,7 @@ class PromptBuilder(
 
 
     fun prefix(): String {
-        //("Implement PromptBuilder.prefix (sub-exercise (b)).")
+        //("Implement PromptBuilder.prefix (sub-exercise (b)). ")
         val toolLines = tools.joinToString("\n") { tool ->
             val schema = tool.schema.entries.joinToString(", ") { "${it.key}:${it.value}" }
             val safety = if (tool.risky) "[approval required]" else "[safe]"
