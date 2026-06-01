@@ -2,6 +2,7 @@ package de.seuhd.ktcodingagent.context
 
 import kotlinx.serialization.Serializable
 import java.nio.file.Path
+import java.nio.file.Files
 
 /**
  * Snapshot of stable facts about the workspace, captured once at agent startup.
@@ -63,6 +64,72 @@ data class WorkspaceContext(
  */
 object WorkspaceContextLoader {
     fun load(cwd: Path, walkToRepoRoot: Boolean = true): WorkspaceContext {
-        TODO("Implement WorkspaceContext.load (sub-exercise (b)).")
+        //("Implement WorkspaceContext.load (sub-exercise (b)).")
+        fun sRunCommand(cwd: Path, command: List<String>): String? {
+            return try {
+                //from runCommand test:
+                val process = ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(true).start()
+                process.waitFor()
+                if (process.exitValue() != 0) {
+                    return null
+                }
+
+                process.inputStream.bufferedReader().readText().trim()
+            } catch(_: Exception){
+                null
+                }
+            }
+
+        val root = sRunCommand(cwd, listOf("git", "rev-parse", "--show-toplevel"))?: cwd.toString()
+        val branch = sRunCommand(cwd, listOf("git", "branch", "--show-current"))?: "-"
+        val branchpath = (sRunCommand(cwd, listOf("git", "symbolic-ref",  "--short", "refs/remotes/origin/HEAD")) ?: "origin/main").removePrefix("origin/")
+        val status = (sRunCommand(cwd, listOf("git", "status", "--short"))?: "clean").take(1500)
+        val log = (sRunCommand(cwd, listOf("git", "log", "--oneline" ,"-5"))?: "").lines().filter { it.isNotBlank() }
+
+        val repofiles = mutableMapOf<String, String>()
+        val files = listOf("AGENTS.md", "README.md", "build.gradle.kts")
+        val searchdir = mutableListOf<Path>()
+
+        if (walkToRepoRoot) {
+            searchdir.add( Path.of(root))
+        }
+        searchdir.add(cwd)
+
+        for (d in searchdir.distinct()){
+            for (name in files){
+                val file = d.resolve(name)
+
+                if (!Files.isRegularFile(file)){
+                    continue
+                }
+
+                val key = file.toAbsolutePath().normalize().toString()
+
+                if (repofiles.containsKey(key)){ continue}
+
+                try {
+                    val content = Files.readString(file)
+                    if (content.length > 1200){
+                    repofiles[key] = content.take(1200) + "...[truncated]"}
+                    else {repofiles[key] = content}}
+                    catch(_: Exception){
+                        //ignore
+                    }
+                }
+            }
+
+
+
+        return WorkspaceContext(
+            cwd = cwd.toString(),
+            repoRoot = root,
+            branch = branch,
+            defaultBranch = branchpath,
+            status = status,
+            recentCommits = log,
+            projectDocs = repofiles
+        )
+
+        }
     }
-}
+
