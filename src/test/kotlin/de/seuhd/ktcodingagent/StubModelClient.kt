@@ -14,7 +14,7 @@ import de.seuhd.ktcodingagent.model.ModelClient
  * AgentTest fails at runtime until `complete` is implemented.
  */
 class StubModelClient(private val scripted: List<String>) : ModelClient {
-    val p = mutableListOf<String>() //store prompts
+    val p = mutableListOf<String>()
     var next = 0
     override fun complete(prompt: String, maxNewTokens: Int): String {
         //("Implement StubModelClient (sub-exercise (c)).")
